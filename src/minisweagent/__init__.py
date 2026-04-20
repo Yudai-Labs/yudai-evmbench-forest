@@ -1,0 +1,93 @@
+"""
+This file provides:
+
+- Path settings for global config file & relative directories
+- Version numbering
+- Protocols for the core components of mini-swe-agent.
+  By the magic of protocols & duck typing, you can pretty much ignore them,
+  unless you want the static type checking.
+"""
+
+__version__ = "2.0.0"
+
+import os
+from pathlib import Path
+from typing import Any, Protocol
+
+import dotenv
+from platformdirs import user_config_dir
+from rich.console import Console
+
+from minisweagent.utils.log import logger
+
+package_dir = Path(__file__).resolve().parent
+
+global_config_dir = Path(os.getenv("MSWEA_GLOBAL_CONFIG_DIR") or user_config_dir("mini-swe-agent"))
+global_config_dir.mkdir(parents=True, exist_ok=True)
+global_config_file = Path(global_config_dir) / ".env"
+
+if not os.getenv("MSWEA_SILENT_STARTUP"):
+    Console().print(
+        f"👋 This is [bold green]mini-swe-agent[/bold green] version [bold green]{__version__}[/bold green].\n"
+        f"Loading global config from [bold green]'{global_config_file}'[/bold green]"
+    )
+dotenv.load_dotenv(dotenv_path=global_config_file)
+
+
+# === Protocols ===
+# You can ignore them unless you want static type checking.
+
+
+class Model(Protocol):
+    """Protocol for language models."""
+
+    config: Any
+
+    def query(self, messages: list[dict[str, Any]], tools: list[dict] | None = None, **kwargs) -> dict: ...
+
+    def format_message(self, role: str, content: str, **kwargs) -> dict: ...
+
+    def format_observation_messages(self, observation: list[dict], *, message: dict | None = None) -> list[dict]: ...
+
+    def get_template_vars(self) -> dict[str, Any]: ...
+
+    def serialize(self) -> dict[str, Any]: ...
+
+
+class Environment(Protocol):
+    """Protocol for execution environments."""
+
+    config: Any
+
+    def execute(self, action: dict, cwd: str = "") -> dict[str, Any]: ...
+
+    def get_template_vars(self) -> dict[str, Any]: ...
+
+    def get_tools(self) -> list[dict]: ...
+
+    def serialize(self) -> dict[str, Any]: ...
+
+
+class Agent(Protocol):
+    """Protocol for agents."""
+
+    model: Model
+    env: Environment
+    messages: list[dict[str, Any]]
+    config: Any
+
+    def run(self, task: str, **kwargs) -> dict: ...
+
+    def save(self, *, exit_info: dict | None = None, **kwargs) -> dict: ...
+
+
+__all__ = [
+    "Agent",
+    "Model",
+    "Environment",
+    "package_dir",
+    "__version__",
+    "global_config_file",
+    "global_config_dir",
+    "logger",
+]
