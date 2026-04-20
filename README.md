@@ -1,92 +1,106 @@
 # yudai-evmbench-forest
 
-Lean EVMBench Forest-of-Thought runner for Yudai mini-swe-agent.
+Lean EVMBench Forest-of-Thought runner for Yudai smart-contract audits.
 
-This repo packages the current `minisweagent` runtime plus the minimum EVMBench Modal Forest adapter from Forest of Audits. It keeps audit datasets and EVMBench task images external, then syncs the adapter into an EVMBench project directory before running.
+This repo contains only the Yudai EVMBench integration:
 
-## What It Runs
+- a Typer CLI that syncs the adapter into an external EVMBench checkout
+- the EVMBench-side Modal Forest adapter under `evmbench/agents/yudai-modal-forest`
+- the Yudai live-contract tool image borrowed from `yudai-swe-agent`
+- a small example agent workspace under `examples/agent-workspace`
 
-The first supported target is EVMBench `detect` mode. The Modal Forest runner uses independent candidate agents in parallel:
+The agent loop comes from the published `mini-swe-agent[modal]` package. This repo does not vendor the `minisweagent` source tree.
 
-1. scout selects specialist trees
-2. branch workers audit independently per tree
-3. tree judges merge branch reports
-4. a global judge writes `submission/audit.md`
-
-Only the global judge is allowed to write the final EVMBench submission.
-
-## Requirements
-
-- `uv`
-- Docker
-- Modal CLI/account for live Modal sandbox runs
-- an EVMBench project checkout, for example `~/Documents/forestOfAudits/project/evmbench`
-- `OPENROUTER_API_KEY` for `openrouter/*` models or `OPENAI_API_KEY` for `openai/*` models
-
-Set a model in your shell or `.env`:
+## Setup
 
 ```bash
-export OPENROUTER_API_KEY=...
-export YUDAI_EVMBENCH_MODEL=openrouter/openai/gpt-5.1
+uv sync
+cp .env.example .env
 ```
+
+Edit `.env` with your model provider key and EVMBench project path:
+
+```bash
+YUDAI_EVMBENCH_PROJECT_DIR=/home/you/Documents/yudai-swe-agent/evmBench-frontier-evals/project/evmbench
+YUDAI_EVMBENCH_MODEL=openrouter/openai/gpt-5.1
+OPENROUTER_API_KEY=...
+```
+
+For Modal runs, authenticate the Modal CLI/account before launching the eval.
 
 ## Smoke Run
 
 ```bash
-python scripts/run_evmbench_forest.py run \
-  --project-dir ~/Documents/forestOfAudits/project/evmbench \
+uv run yudai-evmbench-forest run \
   --audit 2023-07-pooltogether \
-  --model "$YUDAI_EVMBENCH_MODEL" \
   --smoke \
   --branches-per-tree 1 \
   --max-tree-roles 2 \
   --worker-concurrency 2
 ```
 
-The runner first syncs this repo's runtime into `evmbench/vendor/yudai_runtime` and installs the Modal Forest adapter files into the EVMBench project. Outputs land under the EVMBench run directory. For a Modal run, inspect:
+The CLI loads `.env`, syncs the adapter into the EVMBench checkout, and runs:
+
+```bash
+uv run python -m evmbench.nano.entrypoint
+```
+
+inside the EVMBench project.
+
+## Normal Single-Audit Run
+
+```bash
+uv run yudai-evmbench-forest run \
+  --audit 2023-07-pooltogether \
+  --branches-per-tree 2 \
+  --max-tree-roles 4 \
+  --worker-concurrency 4
+```
+
+Outputs land under the EVMBench run directory. For a Modal Forest run, inspect:
 
 - `submission/audit.md`
 - `modal/logs/modal-runner-command.json`
 - `modal/logs/modal-forest-result.json`
 - `modal/forest/**`
 
-## Normal Single-Audit Run
-
-```bash
-python scripts/run_evmbench_forest.py run \
-  --project-dir ~/Documents/forestOfAudits/project/evmbench \
-  --audit 2023-07-pooltogether \
-  --model "$YUDAI_EVMBENCH_MODEL" \
-  --branches-per-tree 2 \
-  --max-tree-roles 4 \
-  --worker-concurrency 4
-```
-
 ## Build Images
 
+The base image is intentionally named by function:
+
 ```bash
-python scripts/run_evmbench_forest.py run \
-  --project-dir ~/Documents/forestOfAudits/project/evmbench \
+docker build -t yudai-base:latest -f docker/live-contract-tools.Dockerfile .
+```
+
+To build through the CLI:
+
+```bash
+uv run yudai-evmbench-forest run \
   --audit 2023-07-pooltogether \
-  --model "$YUDAI_EVMBENCH_MODEL" \
   --build-images \
   --build-only
 ```
 
-## Adapter Files
+The synced EVMBench image uses `evmbench/Dockerfile.yudai`, which installs `mini-swe-agent[modal]`, Modal, and SWE-ReX with `uv`.
 
-The sync step installs these EVMBench-side files:
+## Synced EVMBench Files
+
+The sync step installs only the files required for the Modal Forest path:
 
 - `evmbench/agents/agent.py`
 - `evmbench/agents/modal_runner.py`
 - `evmbench/nano/solver.py`
-- `evmbench/agents/mini-swe-agent/*`
 - `evmbench/Dockerfile.yudai`
+- `evmbench/agents/yudai-modal-forest/*`
 
-It also adds Modal/SWE-ReX development dependencies to the EVMBench `pyproject.toml` if they are missing.
+It also adds these dev dependencies to the EVMBench `pyproject.toml` if missing:
+
+- `mini-swe-agent[modal]>=2.2.8`
+- `modal>=1.4.1`
+- `swe-rex>=1.4.0`
 
 ## Notes
 
-- `detect` is the only supported Modal Forest mode in this first version.
-- Exploit/patch support can be added later using the same staged worker architecture, but this repo intentionally optimizes first for `submission/audit.md`.
-- The sync step mutates the selected external EVMBench project directory. Use a dedicated checkout if you need to preserve another EVMBench tree untouched.
+- `detect` is the only supported mode.
+- The sync step mutates the selected external EVMBench project directory. Use a dedicated checkout if you need to keep another EVMBench tree untouched.
+- `examples/agent-workspace` mirrors the `/home/agent` layout used inside the agent container for local orientation and smoke testing.
