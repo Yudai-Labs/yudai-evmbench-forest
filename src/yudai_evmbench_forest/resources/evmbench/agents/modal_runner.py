@@ -12,10 +12,7 @@ from typing import Any, TextIO
 from evmbench.agents.agent import Agent
 
 
-MODAL_RUNNER_COMMANDS = {
-    "modal_baseline": "baseline",
-    "modal_forest": "forest",
-}
+MODAL_RUNNER_COMMANDS = {"modal_forest": "forest"}
 
 
 @dataclass(frozen=True)
@@ -39,7 +36,7 @@ def _project_root() -> Path:
 
 
 def _entrypoint_path() -> Path:
-    return Path(__file__).resolve().parent / "mini-swe-agent" / "entrypoint.py"
+    return Path(__file__).resolve().parent / "yudai-modal-forest" / "entrypoint.py"
 
 
 def _append_env_flag(command: list[str], env: dict[str, str], flag: str, *names: str) -> None:
@@ -111,8 +108,7 @@ def build_modal_runner_invocation(
         raise ValueError(f"Agent {agent.id!r} is not a Modal runner: {agent.runner!r}.")
     if task.mode != "detect":
         raise RuntimeError(
-            f"Agent {agent.id!r} uses {agent.runner}, which currently supports detect mode only "
-            f"(got {task.mode!r})."
+            f"Agent {agent.id!r} uses {agent.runner}, which currently supports detect mode only (got {task.mode!r})."
         )
 
     env = dict(agent.env_vars or {})
@@ -141,14 +137,7 @@ def build_modal_runner_invocation(
 
     _append_common_modal_flags(command, env)
 
-    if agent.runner == "modal_baseline":
-        _append_env_flag(command, env, "--step-limit", "STEP_LIMIT")
-        _append_env_flag(command, env, "--cost-limit", "COST_LIMIT")
-        _append_env_flag(command, env, "--modal-secret-name", "MODAL_OPENAI_SECRET_NAME")
-        _append_env_flag(command, env, "--judge-model", "JUDGE_MODEL")
-        _append_env_flag(command, env, "--judge-reasoning-effort", "JUDGE_REASONING_EFFORT")
-        command.append("--no-grade")
-    elif agent.runner == "modal_forest":
+    if agent.runner == "modal_forest":
         _append_env_flag(command, env, "--scout-model", "YUDAI_FOREST_SCOUT_MODEL", "SCOUT_MODEL")
         _append_env_flag(command, env, "--branch-model", "YUDAI_FOREST_BRANCH_MODEL", "BRANCH_MODEL")
         _append_env_flag(command, env, "--judge-model", "YUDAI_FOREST_JUDGE_MODEL", "JUDGE_MODEL")
@@ -164,12 +153,20 @@ def build_modal_runner_invocation(
         _append_env_flag(command, env, "--branches-per-tree", "YUDAI_FOREST_BRANCHES_PER_TREE", "BRANCHES_PER_TREE")
         _append_env_flag(command, env, "--max-tree-roles", "YUDAI_FOREST_MAX_TREE_ROLES", "MAX_TREE_ROLES")
         _append_env_flag(command, env, "--tree-roles", "YUDAI_FOREST_TREE_ROLES", "TREE_ROLES")
-        _append_env_flag(command, env, "--worker-concurrency", "YUDAI_FOREST_WORKER_CONCURRENCY", "FOREST_WORKER_CONCURRENCY")
+        _append_env_flag(
+            command,
+            env,
+            "--worker-concurrency",
+            "YUDAI_FOREST_WORKER_CONCURRENCY",
+            "FOREST_WORKER_CONCURRENCY",
+        )
         for name in ("CONTINUE_ON_WORKER_ERROR", "FOREST_CONTINUE_ON_WORKER_ERROR"):
             value = env.get(name)
             if value and value.strip().lower() in {"1", "true", "yes", "on"}:
                 command.append("--continue-on-worker-error")
                 break
+    else:
+        raise ValueError(f"Unsupported Modal runner: {agent.runner!r}.")
 
     return ModalRunnerInvocation(
         command=command,
@@ -229,11 +226,14 @@ def _run_modal_entrypoint_streaming(
     stderr_chunks: list[str] = []
     stdout_log = logs_dir / "modal-runner.stdout.log"
     stderr_log = logs_dir / "modal-runner.stderr.log"
-    with stdout_log.open("w", encoding="utf-8", buffering=1) as stdout_file, stderr_log.open(
-        "w",
-        encoding="utf-8",
-        buffering=1,
-    ) as stderr_file:
+    with (
+        stdout_log.open("w", encoding="utf-8", buffering=1) as stdout_file,
+        stderr_log.open(
+            "w",
+            encoding="utf-8",
+            buffering=1,
+        ) as stderr_file,
+    ):
         process = subprocess.Popen(
             invocation.command,
             cwd=_project_root(),
@@ -295,7 +295,7 @@ def _write_smoke_fallback_submission(agent: Agent, result: ModalRunnerResult) ->
             [
                 "# EVMBench Modal Integration Smoke",
                 "",
-                "This placeholder report was written by the EVMBench Phase 5 adapter.",
+                "This placeholder report was written by the Yudai Modal Forest adapter.",
                 "The capped Modal runner completed successfully but reached its smoke budget before producing /home/agent/submission/audit.md.",
                 "",
                 f"- Agent: `{agent.id}`",
@@ -359,8 +359,5 @@ def run_modal_runner(agent: Agent, task: Any, output_dir: Path) -> ModalRunnerRe
     if not invocation.submission_path.exists() and _env_truthy(env, "MODAL_ALLOW_SMOKE_FALLBACK_SUBMISSION"):
         _write_smoke_fallback_submission(agent, result)
     if not invocation.submission_path.exists():
-        raise RuntimeError(
-            f"Modal runner {agent.runner} completed but did not produce "
-            f"{invocation.submission_path}."
-        )
+        raise RuntimeError(f"Modal runner {agent.runner} completed but did not produce {invocation.submission_path}.")
     return result
