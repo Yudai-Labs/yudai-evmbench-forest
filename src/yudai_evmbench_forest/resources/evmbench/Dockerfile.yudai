@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --no-cache-dir jupyter ipykernel && \
+RUN uv pip install --system --no-cache jupyter ipykernel && \
     python3 -m ipykernel install --sys-prefix
 
 RUN mkdir -p "$AUDIT_DIR" "$SUBMISSION_DIR" "$LOGS_DIR"
@@ -64,23 +64,10 @@ RUN git config --global --add safe.directory $AGENT_DIR && \
 COPY --from=ploit /ploit /usr/local/bin/ploit
 COPY --from=ploit /usr/local/bin/veto /usr/local/bin/veto
 
-COPY evmbench/vendor/yudai_runtime /opt/yudai_runtime
-RUN test -d /opt/yudai_runtime/src/minisweagent
-ENV PYTHONPATH=/opt/yudai_runtime/src:/opt/yudai_runtime:$PYTHONPATH
-RUN python3 -m pip install --no-cache-dir \
-    pyyaml \
-    requests \
-    jinja2 \
-    "pydantic>=2.0" \
-    "litellm>=1.75.5" \
-    tenacity \
-    rich \
-    python-dotenv \
-    typer \
-    platformdirs \
-    textual \
-    prompt_toolkit \
-    "openai!=1.100.0,!=1.100.1"
+RUN uv pip install --system --no-cache \
+    "mini-swe-agent[modal]>=2.2.8" \
+    "modal>=1.4.1" \
+    "swe-rex>=1.4.0"
 
 RUN command -v forge && \
     command -v cast && \
