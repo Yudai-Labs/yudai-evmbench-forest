@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import typer
 from dotenv import load_dotenv
 
-from yudai_evmbench_forest.sync import (
+from yudai_evmbench_forest.evmbench_project import (
     build_evmbench_entrypoint_command,
     build_yudai_images,
     get_default_project_dir,
@@ -19,6 +19,11 @@ app = typer.Typer(rich_markup_mode="rich", add_completion=False)
 ForestMode = Literal["detect"]
 
 
+@app.callback()
+def main() -> None:
+    """Yudai EVMBench Forest CLI."""
+
+
 def _set_if_value(env: dict[str, str], name: str, value: object | None) -> None:
     if value is not None and str(value).strip():
         env[name] = str(value)
@@ -26,18 +31,30 @@ def _set_if_value(env: dict[str, str], name: str, value: object | None) -> None:
 
 @app.command()
 def run(
-    mode: Annotated[ForestMode, typer.Option("--mode", help="EVMBench mode. Modal Forest currently supports detect.")] = "detect",
+    mode: Annotated[
+        ForestMode, typer.Option("--mode", help="EVMBench mode. Modal Forest currently supports detect.")
+    ] = "detect",
     audit: Annotated[str, typer.Option("--audit", help="Single audit ID, e.g. 2023-07-pooltogether.")] = "",
     split: Annotated[str, typer.Option("--split", help="Named EVMBench split file without .txt.")] = "",
-    model: Annotated[str | None, typer.Option("-m", "--model", help="LiteLLM model name, e.g. openrouter/openai/gpt-5.1.")] = None,
+    model: Annotated[
+        str | None, typer.Option("-m", "--model", help="LiteLLM model name, e.g. openrouter/openai/gpt-5.1.")
+    ] = None,
     hint_level: Annotated[str, typer.Option("--hint-level")] = "none",
     concurrency: Annotated[int, typer.Option("--concurrency", min=1)] = 1,
-    project_dir: Annotated[Path, typer.Option("--project-dir", help="External EVMBench project directory.")] = get_default_project_dir(),
-    smoke: Annotated[bool, typer.Option("--smoke/--no-smoke", help="Use the capped smoke Forest agent profile.")] = False,
+    project_dir: Annotated[
+        Path | None, typer.Option("--project-dir", help="External EVMBench project directory.")
+    ] = None,
+    smoke: Annotated[
+        bool, typer.Option("--smoke/--no-smoke", help="Use the capped smoke Forest agent profile.")
+    ] = False,
     agent_id: Annotated[str, typer.Option("--agent-id", help="Override EVMBench agent id.")] = "",
-    sync_only: Annotated[bool, typer.Option("--sync-only", help="Only sync runtime/adapter files into the EVMBench project.")] = False,
-    no_sync: Annotated[bool, typer.Option("--no-sync", help="Do not sync runtime/adapter files before running.")] = False,
-    build_images: Annotated[bool, typer.Option("--build-images", help="Build yudai and audit Docker images before running.")] = False,
+    sync_only: Annotated[
+        bool, typer.Option("--sync-only", help="Only sync adapter files into the EVMBench project.")
+    ] = False,
+    no_sync: Annotated[bool, typer.Option("--no-sync", help="Do not sync adapter files before running.")] = False,
+    build_images: Annotated[
+        bool, typer.Option("--build-images", help="Build yudai and audit Docker images before running.")
+    ] = False,
     build_parallel: Annotated[int, typer.Option("--build-parallel", min=1)] = 4,
     build_only: Annotated[bool, typer.Option("--build-only", help="Build images but skip the eval.")] = False,
     apply_gold_solution: Annotated[bool, typer.Option("--apply-gold-solution")] = False,
@@ -61,18 +78,17 @@ def run(
     load_dotenv(Path.cwd() / ".env", override=False)
     load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
-    project_dir = project_dir.resolve()
+    project_dir = (project_dir or get_default_project_dir()).resolve()
     if not project_dir.exists():
         raise typer.BadParameter(f"EVMBench project directory does not exist: {project_dir}")
 
     selected_audit = audit or None
     selected_split = split or None
-    selected_agent_id = agent_id or ("mini-swe-agent-modal-forest-smoke" if smoke else "mini-swe-agent-modal-forest")
+    selected_agent_id = agent_id or ("yudai-modal-forest-smoke" if smoke else "yudai-modal-forest")
 
     if not no_sync:
-        vendor_dir = sync_all(project_dir)
-        typer.echo(f"Synced yudai runtime into {vendor_dir}")
-        typer.echo(f"Synced Modal Forest adapter into {project_dir / 'evmbench' / 'agents' / 'mini-swe-agent'}")
+        adapter_dir = sync_all(project_dir)
+        typer.echo(f"Synced Yudai Modal Forest adapter into {adapter_dir}")
         if sync_only:
             return
 
