@@ -5,25 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yudai-evmbench-forest"
 version = "0.1.0"
-description = "Lean EVMBench Forest-of-Thought multi-agent Modal runner for yudai mini-swe-agent"
+description = "Lean EVMBench Forest-of-Thought Modal runner for Yudai smart-contract audits"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE.md"}
+license = "MIT"
+license-files = ["LICENSE.md"]
 dependencies = [
-    "pyyaml",
-    "requests",
-    "jinja2",
-    "pydantic>=2.0",
-    "litellm>=1.75.5",
-    "tenacity",
-    "rich",
-    "python-dotenv",
-    "typer",
-    "platformdirs",
-    "textual",
-    "prompt_toolkit",
-    "openai!=1.100.0,!=1.100.1",
+    "mini-swe-agent[modal]>=2.2.8",
     "modal>=1.4.1",
+    "python-dotenv",
+    "typer>=0.12",
     "swe-rex>=1.4.0",
 ]
 
@@ -35,10 +26,9 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["minisweagent*", "yudai_evmbench_forest*"]
+include = ["yudai_evmbench_forest*"]
 
 [tool.setuptools.package-data]
-minisweagent = ["config/**/*"]
 yudai_evmbench_forest = ["resources/**/*"]
 
 [dependency-groups]
