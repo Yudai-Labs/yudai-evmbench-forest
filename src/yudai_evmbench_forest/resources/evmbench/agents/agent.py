@@ -16,17 +16,19 @@ from evmbench.audit import Audit
 from evmbench.utils import get_agents_dir
 import structlog.stdlib
 
+
 @dataclass(frozen=True)
 class Agent:
     id: str
     name: str
     start_sh: str
     instruction_file_name: str
-    runner: Literal["container", "modal_baseline", "modal_forest"] = "container"
+    runner: Literal["container", "modal_forest"] = "container"
     env_vars: dict[str, str] | None = None
     # When EVMbenchSolver.disable_internet is enabled, we use an L4 gateway that allowlists
     # TLS by SNI. This list configures which hostnames are permitted.
     gateway_sni_hosts: list[str] | None = None
+
 
 @dataclass(frozen=True)
 class AgentOutput:
@@ -34,8 +36,9 @@ class AgentOutput:
     time_end: float
     runtime_in_seconds: float
 
+
 class AgentRegistry:
-    _VALID_RUNNERS = {"container", "modal_baseline", "modal_forest"}
+    _VALID_RUNNERS = {"container", "modal_forest"}
 
     def _resolve_env_vars(self, env_vars: dict[str, str]) -> dict[str, str]:
         """
@@ -78,9 +81,7 @@ class AgentRegistry:
                 if not isinstance(gateway_sni_hosts, list) or not all(
                     isinstance(x, str) and x.strip() for x in gateway_sni_hosts
                 ):
-                    raise ValueError(
-                        f"Invalid gateway_sni_hosts for agent '{agent_id}' in {fpath}"
-                    )
+                    raise ValueError(f"Invalid gateway_sni_hosts for agent '{agent_id}' in {fpath}")
                 gateway_sni_hosts = [x.strip() for x in gateway_sni_hosts]
             runner = agent_config.get("runner", "container")
             if runner not in self._VALID_RUNNERS:
@@ -129,14 +130,16 @@ class AgentRegistry:
         instructions = self.get_instructions_path(mode).read_text()
 
         if mode != "exploit" and hint_level in ("high", "max"):
-            raise ValueError(
-                f"Hint level '{hint_level}' is only supported in exploit mode (mode={mode})."
-            )
+            raise ValueError(f"Hint level '{hint_level}' is only supported in exploit mode (mode={mode}).")
 
         # Replace exploit specific placeholders
         if mode == "exploit":
-            instructions = instructions.replace("{EXPLOIT_WALLET_ADDRESS}", audit.ploit_config.wallet_address or EXPLOIT_WALLET_ADDRESS)
-            instructions = instructions.replace("{EXPLOIT_WALLET_PRIVATE_KEY}", audit.ploit_config.wallet_private_key or EXPLOIT_WALLET_PRIVATE_KEY)
+            instructions = instructions.replace(
+                "{EXPLOIT_WALLET_ADDRESS}", audit.ploit_config.wallet_address or EXPLOIT_WALLET_ADDRESS
+            )
+            instructions = instructions.replace(
+                "{EXPLOIT_WALLET_PRIVATE_KEY}", audit.ploit_config.wallet_private_key or EXPLOIT_WALLET_PRIVATE_KEY
+            )
             if agent_rpc_host and agent_rpc_port:
                 base_url = agent_rpc_host
                 rpc_port = agent_rpc_port
@@ -169,10 +172,11 @@ class AgentRegistry:
         for hint in [low_hints, med_hints, high_hints, max_hints]:
             if hint:
                 if first_hint:
-                    instructions = instructions + f"\n\nHints:"
+                    instructions = instructions + "\n\nHints:"
                     first_hint = False
                 instructions = instructions + f"\n\n{hint}"
                 instructions = instructions.strip()
         return instructions
+
 
 agent_registry = AgentRegistry()
