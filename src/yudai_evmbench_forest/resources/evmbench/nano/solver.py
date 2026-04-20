@@ -83,11 +83,7 @@ class EVMbenchSolver(PythonCodingSolver):
         cluster_config = self.runtime_config.build_cluster_config(
             task.docker_image,
         )
-        if (
-            isinstance(task, EVMTask)
-            and task.should_use_sidecar()
-            and not cluster_config.side_images
-        ):
+        if isinstance(task, EVMTask) and task.should_use_sidecar() and not cluster_config.side_images:
             cluster_config.side_images = [task.docker_image]
 
         ctx_logger.info(
@@ -211,9 +207,7 @@ class EVMbenchSolver(PythonCodingSolver):
             ]
             start_script = "\n".join(start_lines) + "\n"
             await asyncio.gather(
-                put_file_in_computer(
-                    computer, agent.start_sh, f"{AGENT_DIR}/start.original.sh"
-                ),
+                put_file_in_computer(computer, agent.start_sh, f"{AGENT_DIR}/start.original.sh"),
                 put_text_in_computer(computer, start_script, f"{AGENT_DIR}/start.sh"),
             )
         else:
@@ -231,9 +225,7 @@ class EVMbenchSolver(PythonCodingSolver):
         # Network rewiring needs access to LocalCluster internals; it does not
         # require Jupyter support.
         if getattr(computer, "_cluster", None) is None:
-            raise RuntimeError(
-                "disable_internet requires an Alcatraz-backed computer."
-            )
+            raise RuntimeError("disable_internet requires an Alcatraz-backed computer.")
 
         # Local runs: use Docker network rewiring (works on macOS Docker Desktop and
         # can also work on Linux) rather than relying on host-level iptables helpers.
@@ -295,6 +287,7 @@ class EVMbenchSolver(PythonCodingSolver):
             patch_harness_path = Path(__file__).resolve().parent / "harness" / "patch_harness.py"
             if patch_harness_path.exists():
                 from evmbench.nano.harness.patch_harness import build_patch_harness_config
+
                 await put_file_in_computer(
                     computer,
                     str(patch_harness_path),
@@ -381,7 +374,7 @@ class EVMbenchSolver(PythonCodingSolver):
         )
 
         ctx_logger.info(
-            purple(f"Writing logs for run to {bf.join(task.runs_dir, task.run_group_id, task.run_id, 'run.log')}") ,
+            purple(f"Writing logs for run to {bf.join(task.runs_dir, task.run_group_id, task.run_id, 'run.log')}"),
             destinations=["group"],
             _print=True,
         )
